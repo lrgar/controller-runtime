@@ -411,6 +411,42 @@ var _ = Describe("Source", func() {
 
 				close(done)
 			})
+			It("should process a preexisting GenericEvent", func(done Done) {
+				ch := make(chan event.GenericEvent, 1)
+				ch <- event.GenericEvent{}
+				processed := make(chan struct{})
+				eventSeen := false
+
+				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
+				instance := &source.Channel{Source: ch}
+				Expect(inject.StopChannelInto(stop, instance)).To(BeTrue())
+				err := instance.Start(handler.Funcs{
+					CreateFunc: func(event.CreateEvent, workqueue.RateLimitingInterface) {
+						defer GinkgoRecover()
+						Fail("Unexpected CreateEvent")
+					},
+					UpdateFunc: func(event.UpdateEvent, workqueue.RateLimitingInterface) {
+						defer GinkgoRecover()
+						Fail("Unexpected UpdateEvent")
+					},
+					DeleteFunc: func(event.DeleteEvent, workqueue.RateLimitingInterface) {
+						defer GinkgoRecover()
+						Fail("Unexpected DeleteEvent")
+					},
+					GenericFunc: func(evt event.GenericEvent, q2 workqueue.RateLimitingInterface) {
+						defer GinkgoRecover()
+						eventSeen = true
+						close(processed)
+					},
+				}, q)
+				Expect(err).NotTo(HaveOccurred())
+
+				<-processed
+
+				Expect(eventSeen).To(BeTrue())
+
+				close(done)
+			})
 			It("should get error if no source specified", func(done Done) {
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
 				instance := &source.Channel{ /*no source specified*/ }

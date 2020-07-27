@@ -213,11 +213,6 @@ func (cs *Channel) Start(
 		cs.DestBufferSize = defaultBufferSize
 	}
 
-	cs.once.Do(func() {
-		// Distribute GenericEvents to all EventHandler / Queue pairs Watching this source
-		go cs.syncLoop()
-	})
-
 	dst := make(chan event.GenericEvent, cs.DestBufferSize)
 	go func() {
 		for evt := range dst {
@@ -239,6 +234,11 @@ func (cs *Channel) Start(
 	defer cs.destLock.Unlock()
 
 	cs.dest = append(cs.dest, dst)
+
+	cs.once.Do(func() {
+		// Distribute GenericEvents to all EventHandler / Queue pairs Watching this source
+		go cs.syncLoop()
+	})
 
 	return nil
 }
